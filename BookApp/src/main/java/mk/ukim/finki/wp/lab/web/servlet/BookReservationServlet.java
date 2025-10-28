@@ -5,9 +5,11 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mk.ukim.finki.wp.lab.model.Book;
 import mk.ukim.finki.wp.lab.model.BookReservation;
 import mk.ukim.finki.wp.lab.repository.BookReservationRepository;
 import mk.ukim.finki.wp.lab.service.BookReservationService;
+import mk.ukim.finki.wp.lab.service.BookService;
 import org.thymeleaf.context.WebContext;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.web.IWebExchange;
@@ -19,10 +21,12 @@ import java.io.IOException;
 public class BookReservationServlet extends HttpServlet {
     private final SpringTemplateEngine templateEngine;
     private final BookReservationService bookReservationService;
+    private final BookService bookService;
 
-    public BookReservationServlet(SpringTemplateEngine templateEngine, BookReservationService bookReservationService) {
+    public BookReservationServlet(SpringTemplateEngine templateEngine, BookReservationService bookReservationService, BookService bookService) {
         this.templateEngine = templateEngine;
         this.bookReservationService = bookReservationService;
+        this.bookService = bookService;
     }
 
     @Override
@@ -46,8 +50,14 @@ public class BookReservationServlet extends HttpServlet {
         }
 
         BookReservation reservation;
+        Book book;
         try {
             reservation = bookReservationService.placeReservation(bookTitle, readerName, readerAddress, numberOfCopies);
+            book = bookService.listAll()
+                    .stream()
+                    .filter(b -> b.getTitle().equals(reservation.getBookTitle()))
+                    .findFirst()
+                    .orElse(null);
         } catch (IllegalArgumentException e) {
             resp.sendRedirect("/?errorMessage=" + e.getMessage());
             return;
@@ -60,6 +70,13 @@ public class BookReservationServlet extends HttpServlet {
         WebContext context = new WebContext(webExchange);
         context.setVariable("reservation", reservation);
         context.setVariable("ipAddress", req.getRemoteAddr());
+
+        if(book != null) {
+            context.setVariable("bookTitle", book.getTitle());
+            context.setVariable("bookGenre", book.getGenre());
+            context.setVariable("bookRating", book.getAverageRating());
+
+        }
 
         templateEngine.process("reservationConfirmation.html", context, resp.getWriter());
 
